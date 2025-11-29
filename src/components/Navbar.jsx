@@ -1,8 +1,17 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { navbarStyles } from "../assets/dummyStyles";
 import logo from "../assets/logo.png";
-import { BookMarked, BookOpen, Contact, Home, Users } from "lucide-react";
+import {
+  BookMarked,
+  BookOpen,
+  Contact,
+  Home,
+  Users,
+  Menu,
+  X,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useAuth, useClerk, UserButton, useUser } from "@clerk/clerk-react";
 
 const navItems = [
   { name: "Home", icon: Home, href: "/" },
@@ -12,8 +21,80 @@ const navItems = [
   { name: "Contact", icon: Contact, href: "/contact" },
 ];
 const Navbar = () => {
+  // for clark auth
+  const { openSignUp } = useClerk();
+  const { isSignedIn } = useUser();
+  const { getToken } = useAuth();
+
+  // for mobile toggle
+  const [isOpen, setIsOpen] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
   const [isScrolled, setScrolled] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
+
+  const menuRef = useRef(null);
+  const isLoggedIn = isSignedIn && Boolean(localStorage.getItem("token"));
+
+  // fetch token function
+  useEffect(() => {
+    const loadToken = async () => {
+      if (isSignedIn) {
+        const token = await getToken();
+        localStorage.setItem("token", token);
+        console.log("Clerk Login Token:", token);
+      }
+    };
+    loadToken();
+  }, [isSignedIn, getToken]);
+
+  //remove token on sign out
+  useEffect(() => {
+    if (!isSignedIn) {
+      localStorage.removeItem("token");
+      console.log("Clerk Logout: Token removed");
+    }
+  }, [isSignedIn]);
+
+  // INSTANT token removal using Clerk logout event
+  useEffect(() => {
+    const handleLogout = () => {
+      localStorage.removeItem("token");
+      console.log("Token removed instantly on Clerk logout event");
+    };
+
+    window.addEventListener("user:signed_out", handleLogout);
+    return () => window.removeEventListener("user:signed_out", handleLogout);
+  }, []);
+
+  // Scroll hide/show
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setIsScrolled(scrollY > 20);
+
+      if (scrollY > lastScrollY && scrollY > 100) {
+        setShowNavbar(false);
+      } else {
+        setShowNavbar(true);
+      }
+      setLastScrollY(scrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   const desktopLinkClass = (isActive) => {
     return `${navbarStyles.desktopNavItem} 
@@ -70,7 +151,97 @@ const Navbar = () => {
               })}
             </div>
           </div>
+
+          {/* Right Side */}
+
+          <div className={navbarStyles.authContainer}>
+            {!isSignedIn ? (
+              <button
+                type="button"
+                onClick={() => openSignUp({})}
+                className={
+                  navbarStyles.createAccountButton ?? navbarStyles.loginButton
+                }
+              >
+                <span>Create Account</span>
+              </button>
+            ) : (
+              <div className="flex items-center">
+                <UserButton afterSignOutUrl="/" />
+              </div>
+            )}
+
+            {/*  toggle */}
+
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className={navbarStyles.mobileMenuButton}
+            >
+              {isOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Menu or nav */}
+
+        <div
+          className={`${navbarStyles.mobileMenu} ${
+            isOpen ? navbarStyles.mobileMenuOpen : navbarStyles.mobileMenuClosed
+          }`}
+          ref={menuRef}
+        >
+          <div className={navbarStyles.mobileMenuContainer}>
+            <div className={navbarStyles.mobileMenuItems}>
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    end={item.href === "/"}
+                    className={({ isActive }) =>
+                      `${navbarStyles.mobileMenuItem} 
+                      ${isActive ? navbarStyles.mobileMenuItemActive : ""} 
+                      ${navbarStyles.mobileMenuItemHover}`
+                    }
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className={navbarStyles.mobileMenuIconContainer}>
+                      <Icon size={18} className={navbarStyles.mobileMenuIcon} />
+                    </div>
+                    <span className={navbarStyles.mobileMenuText}>
+                      {item.name}
+                    </span>
+                  </NavLink>
+                );
+              })}
+
+              {!isSignedIn ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openSignUp({});
+                    setIsOpen(false);
+                  }}
+                  className={
+                    navbarStyles.mobileCreateAccountButton ??
+                    navbarStyles.mobileLoginButton
+                  }
+                >
+                  <span>Create Account</span>
+                </button>
+              ) : (
+                <div className=" px-4 py-2">
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={navbarStyles.backgroundPattern}>
+        <div className={navbarStyles.pattern}></div>
       </div>
     </nav>
   );
