@@ -35,10 +35,10 @@ const Banner = () => {
             </span>
             <h1 className={bannerStyles.heading}>
               <span className={bannerStyles.headingSpan1}>
-                Build Amazing
+                Empower Digital
               </span>
               <span className={bannerStyles.headingSpan2}>
-                Digital Products
+                Learning Growth
               </span>
             </h1>
 
